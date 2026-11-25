@@ -6,12 +6,12 @@
 - **Método:** exploração manual (Playwright MCP e `curl`) + testes automatizados em `features/manageProducts.feature`
 - **Pré-requisito comum:** criar um utilizador com `administrador: "true"` (`POST /usuarios`) e obter o token (`POST /login`).
 
-| ID | Título | Área | Severidade |
-|----|--------|------|------------|
-| BUG-01 | `POST /produtos` aceita `preco` como string e converte-o em silêncio | API | Média |
-| BUG-02 | Preço só aceita inteiros (sem cêntimos) | API | Média |
-| BUG-03 | Verificação de nome duplicado é sensível a maiúsculas/minúsculas | API | Baixa |
-| BUG-04 | Frontend escreve os dados do formulário na consola a cada tecla | Frontend | Baixa |
+| ID     | Título                                                               | Área     | Severidade |
+| ------ | -------------------------------------------------------------------- | -------- | ---------- |
+| BUG-01 | `POST /produtos` aceita `preco` como string e converte-o em silêncio | API      | Média      |
+| BUG-02 | Preço só aceita inteiros (sem cêntimos)                              | API      | Média      |
+| BUG-03 | Verificação de nome duplicado é sensível a maiúsculas/minúsculas     | API      | Baixa      |
+| BUG-04 | Frontend escreve os dados do formulário na consola a cada tecla      | Frontend | Baixa      |
 
 ---
 
@@ -20,6 +20,7 @@
 **Severidade:** Média — **Estado:** Reproduzido
 
 **Passos**
+
 1. Autenticar como administrador e obter o token.
 2. Enviar:
    ```bash
@@ -42,6 +43,7 @@
 **Severidade:** Média (a confirmar com o produto se é intencional) — **Estado:** Reproduzido
 
 **Passos**
+
 1. `POST /produtos` com `"preco": 10.567` (ou `10.5`).
 
 **Resultado obtido:** `400 {"preco":"preco deve ser um inteiro"}`.
@@ -57,6 +59,7 @@
 **Severidade:** Baixa — **Estado:** Reproduzido
 
 **Passos**
+
 1. `POST /produtos` com `"nome":"CaseTest 1"` → `201`.
 2. `POST /produtos` com `"nome":"casetest 1"` → `201`.
 
@@ -73,6 +76,7 @@
 **Severidade:** Baixa — **Estado:** Reproduzido
 
 **Passos**
+
 1. Iniciar sessão como administrador em https://front.serverest.dev/login.
 2. Abrir "Cadastrar Produtos" com as DevTools abertas (consola).
 3. Escrever nos campos nome, preço, descrição e quantidade.
@@ -89,4 +93,3 @@
 
 - A lista de produtos do frontend é pública e partilhada, por isso cresce sem limite e mistura dados de outros utilizadores. Isso dificulta a verificação de resultados; os testes automatizados usam nomes únicos para o contornar.
 - Utilizadores e produtos de teste são removidos periodicamente pelo ambiente. Os testes criam sempre os seus próprios dados.
-- Não foi verificado o comportamento do frontend ao submeter o formulário de produto vazio.

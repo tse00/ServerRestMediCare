@@ -6,7 +6,7 @@
   "scripts": {
     "bddgen": "bddgen",
     "test": "bddgen && playwright test",
-    "test:products": "bddgen && playwright test --grep \"Manage\"",
+    "test:products": "bddgen && playwright test --grep \"manageProducts\"",
     "format": "prettier --write .",
     "lint": "eslint ."
   },
