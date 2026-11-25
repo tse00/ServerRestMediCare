@@ -14,6 +14,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: [['list'], cucumberReporter('html', { outputFile: 'cucumber-report/report.html' })],
   use: {
+    baseURL: 'https://front.serverest.dev',
+    headless: false,
     trace: 'on-first-retry',
   },
   projects: [
