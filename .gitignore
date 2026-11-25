@@ -10,3 +10,6 @@ node_modules/
 /playwright/.auth/
 /.playwright/
 /.env
+/.features-gen/
+/cucumber-report/
+/.playwright-mcp/*
