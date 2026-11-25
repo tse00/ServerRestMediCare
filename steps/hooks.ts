@@ -16,7 +16,7 @@ Before(async ({ request, testContext }) => {
         data: adminUser,
     });
 
-    const registerBody: { message: string; _id?: string } = await registerRes.json();
+    const registerBody = (await registerRes.json()) as { message: string; _id?: string };
 
     if (registerRes.status() === 400) {
       console.log(`Admin already exists: ${adminUser.email} (${registerBody.message})`);
@@ -35,7 +35,7 @@ Before(async ({ request, testContext }) => {
     });
     expect(loginRes.ok()).toBeTruthy();
 
-    const loginBody: { message: string; authorization: string } = await loginRes.json();
+    const loginBody = (await loginRes.json()) as { message: string; authorization: string };
 
     // Save login details
     testContext.adminUser = adminUser;

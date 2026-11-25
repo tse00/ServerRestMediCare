@@ -13,7 +13,7 @@ interface ProductData {
 }
 
 async function storeResponse(ctx: TestContext, res: APIResponse): Promise<void> {
-    ctx.apiResponse = { status: res.status(), body: await res.json() };
+    ctx.apiResponse = { status: res.status(), body: (await res.json()) as Record<string, unknown> };
 }
 
 function requireBody(ctx: TestContext): Record<string, unknown> {
@@ -21,77 +21,79 @@ function requireBody(ctx: TestContext): Record<string, unknown> {
     return ctx.apiResponse.body;
 }
 
-function productRow(page: import('@playwright/test').Page, name: string) {
-    return page.getByRole('row').filter({ hasText: name });
-}
-
 // ---------- Background ----------
 
-Given('estou autenticado como administrador no sistema', async ({ page, testContext }) => {
-    if (!testContext.adminUser) {
-        throw new Error('Admin user was not created before.');
-    }
-
-    await page.goto('/login');
-    await page.getByTestId('email').fill(testContext.adminUser.email);
-    await page.getByTestId('senha').fill(testContext.adminUser.password);
-    await page.getByTestId('entrar').click();
-
-    await expect(page).toHaveURL(/.*\/admin\/home/);
+Given('estou autenticado como administrador no sistema', async ({ loginPage, adminHomePage, testContext }) => {
+    const { email, password } = testContext.adminUser!;
+    await loginPage.goto();
+    await loginPage.login(email, password);
+    await adminHomePage.expectToBeOpen();
 });
 
 // ---------- Frontend ----------
 
 When(
     'registo um produto no frontend com preço {string}, descrição {string} e quantidade {string}',
-    async ({ page, testContext }, preco: string, descricao: string, quantidade: string) => {
+    async (
+        { adminHomePage, registerProductPage, testContext },
+        price: string,
+        description: string,
+        quantity: string,
+    ) => {
         testContext.productName = newProductName();
-        await page.getByTestId('cadastrar-produtos').click();
-        await page.getByTestId('nome').fill(testContext.productName);
-        await page.getByTestId('preco').fill(preco);
-        await page.getByTestId('descricao').fill(descricao);
-        await page.getByTestId('quantity').fill(quantidade);
-        await page.getByTestId('cadastarProdutos').click();
+        await adminHomePage.openRegisterProduct();
+        await registerProductPage.registerProduct({
+            name: testContext.productName,
+            price,
+            description,
+            quantity,
+        });
     },
 );
 
 When(
     'registo no frontend um produto com o mesmo nome, preço {string}, descrição {string} e quantidade {string}',
-    async ({ page, testContext }, preco: string, descricao: string, quantidade: string) => {
-        await page.getByTestId('cadastrar-produtos').click();
-        await page.getByTestId('nome').fill(testContext.productName!);
-        await page.getByTestId('preco').fill(preco);
-        await page.getByTestId('descricao').fill(descricao);
-        await page.getByTestId('quantity').fill(quantidade);
-        await page.getByTestId('cadastarProdutos').click();
+    async (
+        { adminHomePage, registerProductPage, testContext },
+        price: string,
+        description: string,
+        quantity: string,
+    ) => {
+        await adminHomePage.openRegisterProduct();
+        await registerProductPage.registerProduct({
+            name: testContext.productName!,
+            price,
+            description,
+            quantity,
+        });
     },
 );
 
-When('abro a lista de produtos', async ({ page }) => {
-    await page.getByTestId('listar-produtos').click();
+When('abro a lista de produtos', async ({ adminHomePage }) => {
+    await adminHomePage.openProductList();
 });
 
-Then('sou redirecionado para a lista de produtos', async ({ page }) => {
-    await expect(page).toHaveURL(/.*\/admin\/listarprodutos/);
+Then('sou redirecionado para a lista de produtos', async ({ productListPage }) => {
+    await productListPage.expectToBeOpen();
 });
 
 Then(
     'o produto registado aparece na lista com preço {string}, descrição {string} e quantidade {string}',
-    async ({ page, testContext }, preco: string, descricao: string, quantidade: string) => {
-        await expect(page).toHaveURL(/.*\/admin\/listarprodutos/);
-        const row = productRow(page, testContext.productName!);
-        await expect(row).toHaveCount(1);
-        const cells = row.getByRole('cell');
-        await expect(cells.nth(0)).toHaveText(testContext.productName!);
-        await expect(cells.nth(1)).toHaveText(preco);
-        await expect(cells.nth(2)).toHaveText(descricao);
-        await expect(cells.nth(3)).toHaveText(quantidade);
+    async ({ productListPage, testContext }, price: string, description: string, quantity: string) => {
+        const name = testContext.productName!;
+        await productListPage.expectToBeOpen();
+        await expect(productListPage.rowOf(name)).toHaveCount(1);
+        const cells = productListPage.cellsOf(name);
+        await expect(cells.nth(0)).toHaveText(name);
+        await expect(cells.nth(1)).toHaveText(price);
+        await expect(cells.nth(2)).toHaveText(description);
+        await expect(cells.nth(3)).toHaveText(quantity);
     },
 );
 
-Then('vejo a mensagem de erro {string}', async ({ page }, message: string) => {
-    await expect(page.getByText(message)).toBeVisible();
-    await expect(page).toHaveURL(/.*\/admin\/cadastrarprodutos/);
+Then('vejo a mensagem de erro {string}', async ({ registerProductPage }, message: string) => {
+    await expect(registerProductPage.message(message)).toBeVisible();
+    await registerProductPage.expectToBeOpen();
 });
 
 // ---------- API ----------
@@ -105,7 +107,7 @@ Given(
             headers: { Authorization: testContext.token! },
         });
         expect(res.status()).toBe(201);
-        const body: { _id: string } = await res.json();
+        const body = (await res.json()) as { _id: string };
         testContext.productName = data.nome;
         testContext.productId = body._id;
     },
@@ -123,7 +125,7 @@ Given('existe um utilizador não administrador autenticado na API', async ({ req
         data: { email: user.email, password: user.password },
     });
     expect(login.ok()).toBeTruthy();
-    const body: { authorization: string } = await login.json();
+    const body = (await login.json()) as { authorization: string };
     testContext.nonAdminToken = body.authorization;
 });
 
@@ -188,36 +190,41 @@ When('consulto o produto na API pelo seu ID', async ({ request, testContext }) =
     await storeResponse(testContext, res);
 });
 
-Then('a API responde com o estado {int}', async ({ testContext }, status: number) => {
+Then('a API responde com o estado {int}', ({ testContext }, status: number) => {
     expect(testContext.apiResponse?.status).toBe(status);
 });
 
-Then('a resposta contém a mensagem {string}', async ({ testContext }, message: string) => {
+Then('a resposta contém a mensagem {string}', ({ testContext }, message: string) => {
     expect(requireBody(testContext).message).toBe(message);
 });
 
-Then('a resposta contém o {string} do produto', async ({ testContext }, field: string) => {
+Then('a resposta contém o {string} do produto', ({ testContext }, field: string) => {
     expect(requireBody(testContext)[field]).toEqual(expect.any(String));
     expect(requireBody(testContext)[field]).not.toBe('');
 });
 
-Then('a resposta contém o erro {string} com {string}', async ({ testContext }, field: string, message: string) => {
+Then('a resposta contém o erro {string} com {string}', ({ testContext }, field: string, message: string) => {
     expect(requireBody(testContext)[field]).toBe(message);
 });
 
 Then(
     'a lista contém exatamente {int} produto com o nome, preço {int}, descrição {string} e quantidade {int}',
-    async ({ testContext }, count: number, preco: number, descricao: string, quantidade: number) => {
+    ({ testContext }, count: number, preco: number, descricao: string, quantidade: number) => {
         const body = requireBody(testContext) as { quantidade: number; produtos: ProductData[] };
         expect(body.quantidade).toBe(count);
         expect(body.produtos).toHaveLength(count);
-        expect(body.produtos[0]).toMatchObject({ nome: testContext.productName, preco, descricao, quantidade });
+        expect(body.produtos[0]).toMatchObject({
+            nome: testContext.productName,
+            preco,
+            descricao,
+            quantidade,
+        });
     },
 );
 
 Then(
     'o produto devolvido tem o nome, preço {int}, descrição {string} e quantidade {int}',
-    async ({ testContext }, preco: number, descricao: string, quantidade: number) => {
+    ({ testContext }, preco: number, descricao: string, quantidade: number) => {
         expect(requireBody(testContext)).toMatchObject({
             nome: testContext.productName,
             preco,
