@@ -4,7 +4,6 @@ Feature: Gestão de Produtos (Administrador)
     Given estou autenticado como administrador no sistema
 
   # ---------- Frontend ----------
-
   @ui
   Scenario: Registar um produto com sucesso no frontend
     When registo um produto no frontend com preço "100", descrição "Produto de teste" e quantidade "5"
@@ -24,7 +23,6 @@ Feature: Gestão de Produtos (Administrador)
     Then o produto registado aparece na lista com preço "75", descrição "Listado" e quantidade "3"
 
   # ---------- API (/produtos) ----------
-
   @api
   Scenario: Registar um produto com sucesso na API
     When registo um produto na API com preço 100, descrição "Produto API" e quantidade 5
