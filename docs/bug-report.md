@@ -6,12 +6,13 @@
 - **Método:** exploração manual (Playwright MCP e `curl`) + testes automatizados em `features/manageProducts.feature`
 - **Pré-requisito comum:** criar um utilizador com `administrador: "true"` (`POST /usuarios`) e obter o token (`POST /login`).
 
-| ID     | Título                                                               | Área     | Severidade |
-| ------ | -------------------------------------------------------------------- | -------- | ---------- |
-| BUG-01 | `POST /produtos` aceita `preco` como string e converte-o em silêncio | API      | Média      |
-| BUG-02 | Preço só aceita inteiros (sem cêntimos)                              | API      | Média      |
-| BUG-03 | Verificação de nome duplicado é sensível a maiúsculas/minúsculas     | API      | Baixa      |
-| BUG-04 | Frontend escreve os dados do formulário na consola a cada tecla      | Frontend | Baixa      |
+| ID     | Título                                                                     | Área     | Severidade |
+| ------ | -------------------------------------------------------------------------- | -------- | ---------- |
+| BUG-01 | `POST /produtos` aceita `preco` como string e converte-o em silêncio       | API      | Média      |
+| BUG-02 | Preço só aceita inteiros (sem cêntimos)                                    | API      | Média      |
+| BUG-03 | Verificação de nome duplicado é sensível a maiúsculas/minúsculas           | API      | Baixa      |
+| BUG-04 | Frontend escreve os dados do formulário na consola a cada tecla            | Frontend | Baixa      |
+| BUG-05 | Frontend permite criar produto sem anexar imagem apesar de ser obrigatório | Frontend | Média      |
 
 ---
 
@@ -89,7 +90,27 @@
 
 ---
 
-## Observações (não classificadas como bug)
+## BUG-05 — Frontend permite criar produto sem anexar imagem apesar de o campo ser apresentado como obrigatório
+
+**Severidade:** Média — **Estado:** Reproduzido
+
+**Passos**
+
+1. Iniciar sessão como administrador em https://front.serverest.dev/login.
+2. Abrir "Cadastrar Produtos".
+3. Preencher os campos nome, preço, descrição e quantidade com valores válidos.
+4. Não anexar nenhum ficheiro no campo de imagem, que é apresentado como obrigatório.
+5. Clicar em "Cadastrar".
+
+**Resultado obtido:** o formulário é submetido sem validação e o produto é criado e listado sem imagem associada.
+
+**Resultado esperado:** a submissão deve ser bloqueada, com uma mensagem de erro junto ao campo de imagem (ex.: "Imagem é obrigatória"). Em alternativa, se a imagem for opcional, o campo não deve ser apresentado como obrigatório.
+
+**Impacto:** a interface está em contradição com o comportamento real, o que induz o utilizador em erro. Podem também ser criados produtos sem imagem, com apresentação inconsistente na listagem.
+
+---
+
+## Observações
 
 - A lista de produtos do frontend é pública e partilhada, por isso cresce sem limite e mistura dados de outros utilizadores. Isso dificulta a verificação de resultados; os testes automatizados usam nomes únicos para o contornar.
 - Utilizadores e produtos de teste são removidos periodicamente pelo ambiente. Os testes criam sempre os seus próprios dados.
