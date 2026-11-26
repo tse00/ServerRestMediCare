@@ -6,13 +6,15 @@
 - **Método:** exploração manual (Playwright MCP e `curl`) + testes automatizados em `features/manageProducts.feature`
 - **Pré-requisito comum:** criar um utilizador com `administrador: "true"` (`POST /usuarios`) e obter o token (`POST /login`).
 
-| ID     | Título                                                                     | Área     | Severidade |
-| ------ | -------------------------------------------------------------------------- | -------- | ---------- |
-| BUG-01 | `POST /produtos` aceita `preco` como string e converte-o em silêncio       | API      | Média      |
-| BUG-02 | Preço só aceita inteiros (sem cêntimos)                                    | API      | Média      |
-| BUG-03 | Verificação de nome duplicado é sensível a maiúsculas/minúsculas           | API      | Baixa      |
-| BUG-04 | Frontend escreve os dados do formulário na consola a cada tecla            | Frontend | Baixa      |
-| BUG-05 | Frontend permite criar produto sem anexar imagem apesar de ser obrigatório | Frontend | Média      |
+| ID     | Título                                                                                    | Área           | Severidade |
+| ------ | ----------------------------------------------------------------------------------------- | -------------- | ---------- |
+| BUG-01 | `POST /produtos` aceita `preco` como string e converte-o em silêncio                      | API            | Média      |
+| BUG-02 | Preço só aceita inteiros (sem cêntimos)                                                   | API            | Média      |
+| BUG-03 | Verificação de nome duplicado é sensível a maiúsculas/minúsculas                          | API            | Baixa      |
+| BUG-04 | Frontend escreve os dados do formulário na consola a cada tecla                           | Frontend       | Baixa      |
+| BUG-05 | Frontend não reconhece os campos preenchidos após erro de validação no registo de produto | Frontend       | Média      |
+| BUG-06 | Frontend permite criar produto sem anexar imagem apesar de ser obrigatório                | Frontend       | Média      |
+| BUG-07 | Campo de imagem do frontend não é suportado pela API e grava `C:\fakepath\...` como texto | Frontend / API | Média      |
 
 ---
 
@@ -90,7 +92,27 @@
 
 ---
 
-## BUG-05 — Frontend permite criar produto sem anexar imagem apesar de o campo ser apresentado como obrigatório
+## BUG-05 — Frontend não reconhece os campos preenchidos após erro de validação no registo de produto
+
+**Severidade:** Média — **Estado:** Reproduzido
+
+**Passos**
+
+1. Iniciar sessão como administrador em https://front.serverest.dev/login.
+2. Abrir "Cadastrar Produtos".
+3. Preencher alguns campos, deixando pelo menos um campo obrigatório em branco (ex.: descrição).
+4. Clicar em "Cadastrar" e verificar que a submissão é rejeitada.
+5. Preencher apenas o campo em falta e clicar novamente em "Cadastrar".
+
+**Resultado obtido:** os campos preenchidos anteriormente continuam visíveis no formulário, mas não são reconhecidos na nova submissão. Para submeter com sucesso, é necessário reintroduzir todos os campos, mesmo os que já apareciam preenchidos.
+
+**Resultado esperado:** os valores visíveis no formulário devem corresponder ao estado interno da aplicação. Depois de corrigir o campo em falta, a submissão deve ser aceite sem exigir que se reintroduzam os restantes.
+
+**Impacto:** existe uma discrepância entre o que o utilizador vê e o que é submetido, o que induz em erro. O utilizador tem de repetir o preenchimento sem perceber porquê, o que prejudica a usabilidade e aumenta o risco de abandono.
+
+---
+
+## BUG-06 — Frontend permite criar produto sem anexar imagem apesar de o campo ser apresentado como obrigatório
 
 **Severidade:** Média — **Estado:** Reproduzido
 
@@ -104,9 +126,52 @@
 
 **Resultado obtido:** o formulário é submetido sem validação e o produto é criado e listado sem imagem associada.
 
-**Resultado esperado:** a submissão deve ser bloqueada, com uma mensagem de erro junto ao campo de imagem (ex.: "Imagem é obrigatória"). Em alternativa, se a imagem for opcional, o campo não deve ser apresentado como obrigatório.
+**Resultado esperado:** a interface deve ser coerente com o comportamento real. Existem duas opções:
+
+- Se a imagem for obrigatória, a submissão deve ser bloqueada, com uma mensagem de erro junto ao campo (ex.: "Imagem é obrigatória").
+- Se a imagem for opcional, ou não for suportada pela API (ver BUG-07), o campo não deve ser apresentado como obrigatório, ou deve ser removido do formulário.
 
 **Impacto:** a interface está em contradição com o comportamento real, o que induz o utilizador em erro. Podem também ser criados produtos sem imagem, com apresentação inconsistente na listagem.
+
+**Nota:** a obrigatoriedade do campo é apenas indicada visualmente na interface, e nem o frontend nem a API a aplicam. A API não documenta o campo `imagem` e aceita a criação de produtos sem ele. Ver também BUG-07.
+
+---
+
+## BUG-07 — Campo de imagem do frontend não é suportado pela API e grava `C:\fakepath\...` como texto
+
+**Severidade:** Média — **Estado:** Reproduzido
+
+**Passos**
+
+1. Iniciar sessão como administrador em https://front.serverest.dev/login.
+2. Abrir "Cadastrar Produtos".
+3. Preencher os campos obrigatórios e anexar um ficheiro de imagem (ex.: `imageServerRest.jpg`).
+4. Com o separador Network aberto, clicar em "Cadastrar".
+5. Analisar o pedido `POST /produtos` e, de seguida, a tabela de produtos.
+6. Comparar com a documentação de `POST /produtos` em https://serverest.dev.
+
+**Resultado obtido:** o pedido `POST /produtos` é enviado com `Content-Type: application/json;charset=UTF-8` e o seguinte corpo:
+
+```json
+{
+  "nome": "oopii",
+  "preco": 56,
+  "descricao": "grhtjy",
+  "quantidade": 2,
+  "imagem": "C:\\fakepath\\imageServerRest.jpg"
+}
+```
+
+O ficheiro não é enviado, só o valor textual do campo. A API grava essa string e devolve-a em `GET /produtos` (`"imagem": "C:\\fakepath\\imageServerRest.jpg"`). A coluna "Imagem" da tabela apresenta esse texto em vez da imagem. Após selecionar o ficheiro, o mesmo valor é também escrito na consola.
+
+A documentação da API não prevê esta funcionalidade. O schema de `POST /produtos` só define `nome`, `preco`, `descricao` e `quantidade`, e não existe nenhum endpoint de upload.
+
+**Resultado esperado:** o frontend e a API devem estar alinhados. Existem duas opções:
+
+- Se a imagem faz parte do produto, a API deve documentar o campo e suportar o upload, e o frontend deve enviar o ficheiro e apresentar a imagem.
+- Se não faz, o campo deve ser removido do formulário, ou indicado como não suportado.
+
+**Impacto:** o utilizador é levado a anexar um ficheiro que nunca é guardado. `C:\fakepath\` é o valor que o browser devolve por segurança para ocultar o caminho real, por isso a referência gravada não permite recuperar a imagem. A API aceita e persiste um campo que não está documentado, sem qualquer validação. A funcionalidade de upload não pode ser validada.
 
 ---
 
