@@ -1,7 +1,6 @@
-import { expect, APIResponse } from '@playwright/test';
-import { Given, When, Then, TestContext } from './fixtures';
-
-const BASE_API_URL = 'https://serverest.dev';
+import { expect } from '@playwright/test';
+import { Given, When, Then } from './fixtures';
+import { storeResponse, requireBody, BASE_API_URL } from '../support/apiHelpers';
 
 const newProductName = (): string => `Produto QA ${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
@@ -10,15 +9,6 @@ interface ProductData {
   preco: number;
   descricao: string;
   quantidade: number;
-}
-
-async function storeResponse(ctx: TestContext, res: APIResponse): Promise<void> {
-  ctx.apiResponse = { status: res.status(), body: (await res.json()) as Record<string, unknown> };
-}
-
-function requireBody(ctx: TestContext): Record<string, unknown> {
-  if (!ctx.apiResponse) throw new Error('No API response stored.');
-  return ctx.apiResponse.body;
 }
 
 // ---------- UI ----------
@@ -109,25 +99,6 @@ Given(
   },
 );
 
-Given(
-  'existe um utilizador não administrador autenticado na API',
-  async ({ request, testContext }) => {
-    const user = {
-      nome: 'Standard QA',
-      email: `user_${Date.now()}_${Math.floor(Math.random() * 100000)}@qa.com`,
-      password: 'Password123',
-      administrador: 'false',
-    };
-    expect((await request.post(`${BASE_API_URL}/usuarios`, { data: user })).ok()).toBeTruthy();
-    const login = await request.post(`${BASE_API_URL}/login`, {
-      data: { email: user.email, password: user.password },
-    });
-    expect(login.ok()).toBeTruthy();
-    const body = (await login.json()) as { authorization: string };
-    testContext.nonAdminToken = body.authorization;
-  },
-);
-
 When(
   'registo um produto na API com preço {int}, descrição {string} e quantidade {int}',
   async ({ request, testContext }, preco: number, descricao: string, quantidade: number) => {
@@ -198,25 +169,10 @@ When('consulto o produto na API pelo seu ID', async ({ request, testContext }) =
   await storeResponse(testContext, res);
 });
 
-Then('a API responde com o estado {int}', ({ testContext }, status: number) => {
-  expect(testContext.apiResponse?.status).toBe(status);
-});
-
-Then('a resposta contém a mensagem {string}', ({ testContext }, message: string) => {
-  expect(requireBody(testContext).message).toBe(message);
-});
-
 Then('a resposta contém o {string} do produto', ({ testContext }, field: string) => {
-  expect(requireBody(testContext)[field]).toEqual(expect.any(String));
-  expect(requireBody(testContext)[field]).not.toBe('');
+    expect(requireBody(testContext)[field]).toEqual(expect.any(String));
+    expect(requireBody(testContext)[field]).not.toBe('');
 });
-
-Then(
-  'a resposta contém o erro {string} com {string}',
-  ({ testContext }, field: string, message: string) => {
-    expect(requireBody(testContext)[field]).toBe(message);
-  },
-);
 
 Then(
   'a lista contém exatamente {int} produto com o nome, preço {int}, descrição {string} e quantidade {int}',
